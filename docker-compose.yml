@@ -1,0 +1,146 @@
+version: '3'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    ports:
+      - "$ZOOKEEPER_CLIENT_PORT:2181"
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      ZOOKEEPER_CLIENT_PORT: $ZOOKEEPER_CLIENT_PORT
+      ZOOKEEPER_TICK_TIME: $ZOOKEEPER_TICK_TIME
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.0.1
+    depends_on:
+      - kafka1
+      - zookeeper
+    ports:
+      - "8081:8081"
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka1:9092
+      SCHEMA_REGISTRY_HOST_NAME: $SCHEMA_REGISTRY_HOST_NAME
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+  kafka1:
+    image: confluentinc/cp-kafka:7.0.1
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
+      KAFKA_ZOOKEEPER_CONNECT: $KAFKA_ZOOKEEPER_CONNECT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: $KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: $KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.0.1
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
+      KAFKA_ZOOKEEPER_CONNECT: $KAFKA_ZOOKEEPER_CONNECT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: $KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: $KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    depends_on:
+      - kafka1
+    ports:
+      - "8080:8080"
+    networks:
+      - kafka-network
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  produce-order-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-produce-order
+    profiles: [workers]
+    deploy:
+      replicas: $PRODUCER_REPLICAS
+    depends_on:
+      - kafka1
+      - kafka2
+      - schema-registry
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      KAFKA_BASE_URL: $KAFKA_DOCKER_BOOTSTRAP_SERVERS
+      SCHEMA_REGISTRY_BASE_URL: $SCHEMA_REGISTRY_DOCKER_BASE_URL
+    restart: on-failure
+    stop_grace_period: 150s
+
+  single-consume-order-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-single-consume-order
+    profiles: [workers]
+    deploy:
+      replicas: $SINGLE_CONSUMER_REPLICAS
+    depends_on:
+      - kafka1
+      - kafka2
+      - schema-registry
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      KAFKA_BASE_URL: $KAFKA_DOCKER_BOOTSTRAP_SERVERS
+      SCHEMA_REGISTRY_BASE_URL: $SCHEMA_REGISTRY_DOCKER_BASE_URL
+    restart: on-failure
+    stop_grace_period: 30s
+
+  batch-consume-order-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-batch-consume-order
+    profiles: [workers]
+    deploy:
+      replicas: $BATCH_CONSUMER_REPLICAS
+    depends_on:
+      - kafka1
+      - kafka2
+      - schema-registry
+    networks:
+      - kafka-network
+    env_file:
+      - .env.example
+      - .env
+    environment:
+      KAFKA_BASE_URL: $KAFKA_DOCKER_BOOTSTRAP_SERVERS
+      SCHEMA_REGISTRY_BASE_URL: $SCHEMA_REGISTRY_DOCKER_BASE_URL
+    restart: on-failure
+    stop_grace_period: 30s
+
+networks:
+  kafka-network:
+    external: false

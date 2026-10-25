@@ -1,0 +1,42 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = "Итоговая проектная работа 1 спринта"
+readme = "README.md"
+authors = [
+    { name = "Rinat", email = "Rinat.Kuchaev@x5.ru" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "confluent-kafka[avro,json,schemaregistry]>=2.16.0",
+    "pydantic>=2.14.1",
+]
+
+[project.scripts]
+app = "app:main"
+producer-worker = "workers.producer:main"
+single-consumer-worker = "workers.single_consumer:main"
+batch-consumer-worker = "workers.batch_consumer:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "ruff>=0.17.2",
+    "types-jsonschema>=4.26.0.20261006",
+]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src", "tests"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["confluent_kafka", "confluent_kafka.*"]
+ignore_missing_imports = true
+
+[tool.uv.build-backend]
+module-name = ["app", "workers"]
