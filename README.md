@@ -12,28 +12,24 @@
    cp .env.example .env
    ```
 
-2. Запустите инфраструктуру: ZooKeeper, два брокера Kafka, Schema Registry и Kafka UI:
+2. Запустите проект:
 
    ```bash
-   docker compose --env-file .env.example --env-file .env up -d zookeeper kafka1 kafka2 schema-registry kafka-ui
-   ```
-
-3. Дождитесь готовности обоих брокеров и Schema Registry. Команды должны завершаться успешно:
-
-   ```bash
-   docker compose exec -T kafka1 kafka-topics --bootstrap-server kafka1:9092 --list
-   docker compose exec -T kafka2 kafka-topics --bootstrap-server kafka2:9092 --list
-   curl -f http://localhost:8081/subjects
-   ```
-
-4. Создайте топик с тремя партициями и двумя репликами, затем запустите воркеры:
-
-   ```bash
-   COMPOSE_ENV_FILES=.env.example,.env bash scripts/kafka_init.sh
    make up
    ```
 
-`make up` собирает образы и запускает Compose с профилем `workers`. Количество экземпляров задаётся в `.env` переменными `PRODUCER_REPLICAS`, `SINGLE_CONSUMER_REPLICAS` и `BATCH_CONSUMER_REPLICAS`; в примере указано по два. Значения `.env` имеют приоритет над `.env.example`. Kafka доступна внутри Docker-сети по адресам `kafka1:9092` и `kafka2:9092`.
+`make up` последовательно запускает инфраструктуру, ожидает готовности обоих брокеров, Schema Registry и Kafka UI, создаёт топик `orders` с тремя партициями и двумя репликами, затем собирает и запускает воркеры. При ошибке любого этапа следующие этапы не выполняются. Повторное создание существующего топика пропускается; его количество партиций и реплик не изменяется.
+
+Для отдельных этапов доступны команды:
+
+| Команда | Назначение |
+| --- | --- |
+| `make infra-up` | Запуск ZooKeeper, Kafka, Schema Registry и Kafka UI |
+| `make infra-wait` | Ожидание готовности инфраструктуры, до 60 проверок |
+| `make topics-init` | Создание топика через `scripts/kafka_init.sh` и настройка `min.insync.replicas=2` |
+| `make workers-up` | Сборка и запуск только воркеров; инфраструктура и топик должны быть подготовлены |
+
+Количество экземпляров задаётся в `.env` переменными `PRODUCER_REPLICAS`, `SINGLE_CONSUMER_REPLICAS` и `BATCH_CONSUMER_REPLICAS`; в примере указано по два. Значения `.env` имеют приоритет над `.env.example`. Kafka доступна внутри Docker-сети по адресам `kafka1:9092` и `kafka2:9092`.
 
 ## Проверка работы кластера и приложения
 
